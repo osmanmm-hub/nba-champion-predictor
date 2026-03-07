@@ -443,8 +443,6 @@ with tab6:
                 team_b: stats_b,
             }).drop('TEAM_NAME')
 
-            compare_df[team_a] = pd.to_numeric(compare_df[team_a], errors='coerce')
-            compare_df[team_b] = pd.to_numeric(compare_df[team_b], errors='coerce')
             compare_df[f'Edge ({team_a})'] = (compare_df[team_a] - compare_df[team_b]).round(3)
             st.dataframe(compare_df.round(3))
 
