@@ -34,47 +34,44 @@ st.markdown("""
 
     /* Tab bar background */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #f0f2f6;
-        border-radius: 10px;
+        background-color: #e8eaf0;
+        border-radius: 8px;
         padding: 4px 6px;
-        gap: 4px;
+        gap: 2px;
         flex-wrap: wrap;
     }
 
-    /* Each tab pill */
+    /* Each tab — all same background */
     .stTabs [data-baseweb="tab"] {
-        background-color: transparent;
-        border-radius: 8px;
+        background-color: #e8eaf0;
+        border-radius: 6px;
         border: none !important;
-        color: #555555;
-        font-size: 0.82rem;
+        color: #666666;
+        font-size: 0.80rem;
         font-weight: 600;
-        padding: 8px 14px;
-        transition: all 0.2s ease;
+        padding: 7px 12px;
+        transition: all 0.15s ease;
         white-space: nowrap;
     }
 
-    /* Hover state */
+    /* Hover */
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #dde1ea;
+        background-color: #d0d4de;
         color: #111111;
     }
 
-    /* Active tab — bold pill in navy */
+    /* Active tab — same bg, bold text + thick underline */
     .stTabs [aria-selected="true"] {
-        background-color: #17408B !important;
-        color: white !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 6px rgba(23,64,139,0.35);
+        background-color: #e8eaf0 !important;
+        color: #000000 !important;
+        font-weight: 900 !important;
+        border-bottom: 3px solid #17408B !important;
+        border-radius: 0px !important;
     }
 
-    /* Remove the default underline indicator */
-    .stTabs [data-baseweb="tab-highlight"] {
-        display: none !important;
-    }
-    .stTabs [data-baseweb="tab-border"] {
-        display: none !important;
-    }
+    /* Remove default indicator lines */
+    .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
+    .stTabs [data-baseweb="tab-border"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -160,11 +157,11 @@ tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
 # TAB 1 — Executive Summary
 # ═══════════════════════════════════════════════════════════
 with tab1:
-    col_logo, col_title = st.columns([1, 5])
+    col_logo, col_title = st.columns([1, 10])
     with col_logo:
         st.image(
             'https://upload.wikimedia.org/wikipedia/en/thumb/0/03/National_Basketball_Association_logo.svg/400px-National_Basketball_Association_logo.svg.png',
-            width=80
+            width=24
         )
     with col_title:
         st.title('NBA Championship Predictor — 2025-26')
