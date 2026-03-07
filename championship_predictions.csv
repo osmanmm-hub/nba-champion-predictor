@@ -1,0 +1,31 @@
+team,W,L,W_PCT,raw_prob,champ_prob_pct
+Detroit Pistons,45,16,0.738,0.9425059,26.9
+Minnesota Timberwolves,40,23,0.635,0.91076237,26.0
+Oklahoma City Thunder,49,15,0.766,0.8343609,23.8
+San Antonio Spurs,46,17,0.73,0.42312145,12.1
+New York Knicks,41,23,0.641,0.13365294,3.8
+Boston Celtics,42,21,0.667,0.065340355,1.9
+Houston Rockets,39,23,0.629,0.019159427,0.5
+Atlanta Hawks,32,31,0.508,0.017742846,0.5
+Los Angeles Lakers,38,25,0.603,0.0122899925,0.4
+New Orleans Pelicans,20,45,0.308,0.009248139,0.3
+LA Clippers,30,32,0.484,0.009198195,0.3
+Golden State Warriors,32,30,0.516,0.009209453,0.3
+Miami Heat,35,29,0.547,0.009209453,0.3
+Cleveland Cavaliers,39,24,0.619,0.0119325165,0.3
+Philadelphia 76ers,34,28,0.548,0.009248139,0.3
+Orlando Magic,33,28,0.541,0.006469923,0.2
+Utah Jazz,19,44,0.302,0.0056191944,0.2
+Dallas Mavericks,21,42,0.333,0.006531311,0.2
+Denver Nuggets,39,25,0.609,0.006962641,0.2
+Chicago Bulls,26,37,0.413,0.007141304,0.2
+Toronto Raptors,35,27,0.565,0.006653584,0.2
+Memphis Grizzlies,23,38,0.377,0.007058837,0.2
+Sacramento Kings,14,50,0.219,0.005279172,0.2
+Indiana Pacers,15,48,0.238,0.004425123,0.1
+Charlotte Hornets,32,32,0.5,0.004279562,0.1
+Brooklyn Nets,15,47,0.242,0.0050279535,0.1
+Milwaukee Bucks,26,35,0.426,0.0044911704,0.1
+Phoenix Suns,36,27,0.571,0.004425123,0.1
+Portland Trail Blazers,30,34,0.469,0.0050279535,0.1
+Washington Wizards,16,46,0.258,0.004279562,0.1
