@@ -170,54 +170,63 @@ with tab3:
     Each model was tested on data it had never seen before.
     """)
 
-    st.markdown("**How to read this table — explained like a basketball scout:**")
+    st.markdown("**What do these numbers actually mean?**")
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.info("""
-**AUC-ROC — Is the scout good at separating winners from losers?**
+**AUC-ROC — How good is the model at sorting teams correctly?**
 
-Imagine lining up all 30 teams randomly. The scout has to sort them into
-"likely champion" vs "not a champion." AUC measures how often the scout
-correctly puts a real contender above a weak team.
+Think of it like a teacher grading 30 students and trying to predict
+who will pass and who will fail before the final exam.
 
-- Score of **1.0** = perfect every time
-- Score of **0.5** = just guessing randomly
-- Our model scores around **0.85** — pretty solid
+AUC measures how often the model correctly places a strong team
+above a weak team when ranking all 30.
 
-This is the most important metric for this app because we care about
-correctly ranking the best teams near the top, not just picking one winner.
+- **1.0** = gets it right every single time
+- **0.5** = no better than flipping a coin
+- **Our model: ~0.85** = gets it right most of the time
+
+This is the most important number in the table because the goal
+of this app is to rank the best teams near the top, not to
+perfectly predict one single winner.
         """)
 
         st.info("""
-**Precision — When the scout makes a pick, how often is he right?**
+**Precision — When the model makes a prediction, how often is it right?**
 
-Say the scout points at 5 teams and says "one of these will win it all."
-If 4 of those 5 were actually championship-caliber, precision is 80%.
+Imagine the model flags 10 teams as "championship contenders."
+If 8 of those 10 actually were contenders, precision is 80%.
 
-High precision = the scout doesn't waste your time with bad picks.
+High precision means the model is not crying wolf —
+when it says a team is good, it usually means it.
         """)
 
     with col2:
         st.info("""
-**Recall — Did the scout find ALL the real contenders?**
+**Recall — Did the model catch every strong team?**
 
-Out of every team that actually WAS a contender, how many did the
-scout catch? If there were 6 real contenders and he only spotted 4
-of them, recall is 67%.
+Now flip the question. Out of all the teams that truly were
+championship-caliber, how many did the model actually catch?
 
-High recall = the scout doesn't miss anyone important.
+If there were 8 real contenders and the model only identified 5,
+recall is 63%. The other 3 were missed.
+
+High recall means the model is thorough —
+it does not overlook teams that deserve attention.
         """)
 
         st.info("""
-**F1 — The scout's overall report card**
+**F1 — The combined overall score**
 
-Precision and recall trade off against each other. If the scout just
-points at every single team, recall is perfect but precision is terrible.
+Precision and recall pull against each other.
+If the model just labels every team as a contender,
+recall is perfect but precision tanks.
 
-F1 combines both into one score that rewards being accurate AND complete.
-Think of it as the scout's final grade.
+F1 balances both into a single number that only goes up
+when the model is both accurate and thorough at the same time.
+Think of it as the model's overall grade.
         """)
 
     st.dataframe(model_results.round(4))
