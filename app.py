@@ -31,32 +31,49 @@ st.markdown("""
         h2 { font-size: 1.2rem !important; }
         h3 { font-size: 1rem !important; }
     }
-    .metric-card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 1rem;
-        text-align: center;
-        border-left: 4px solid #FDB927;
-    }
-    /* Sticky tabs */
+
+    /* Tab bar background */
     .stTabs [data-baseweb="tab-list"] {
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        background-color: white;
-        padding: 6px 0 4px 0;
-        border-bottom: 2px solid #e0e0e0;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        background-color: #f0f2f6;
+        border-radius: 10px;
+        padding: 4px 6px;
+        gap: 4px;
+        flex-wrap: wrap;
     }
+
+    /* Each tab pill */
     .stTabs [data-baseweb="tab"] {
-        font-size: 0.85rem;
-        padding: 6px 10px;
-        font-weight: 500;
+        background-color: transparent;
+        border-radius: 8px;
+        border: none !important;
+        color: #555555;
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 8px 14px;
+        transition: all 0.2s ease;
+        white-space: nowrap;
     }
+
+    /* Hover state */
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #dde1ea;
+        color: #111111;
+    }
+
+    /* Active tab — bold pill in navy */
     .stTabs [aria-selected="true"] {
-        border-bottom: 3px solid #17408B !important;
-        color: #17408B !important;
-        font-weight: 700 !important;
+        background-color: #17408B !important;
+        color: white !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 6px rgba(23,64,139,0.35);
+    }
+
+    /* Remove the default underline indicator */
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
