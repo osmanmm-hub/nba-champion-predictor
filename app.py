@@ -72,6 +72,14 @@ st.markdown("""
     /* Remove default indicator lines */
     .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
     .stTabs [data-baseweb="tab-border"] { display: none !important; }
+
+    /* Sticky tab bar */
+    .stTabs [data-baseweb="tab-list"] {
+        position: sticky !important;
+        top: 2.875rem !important;
+        z-index: 999 !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -152,6 +160,30 @@ tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
     'Head-to-Head',
     'Accuracy & Injuries'
 ])
+
+# Force sticky tabs via JavaScript
+import streamlit.components.v1 as components
+components.html("""
+<script>
+function makeTabsSticky() {
+    const tabList = window.parent.document.querySelector('[data-baseweb="tab-list"]');
+    if (tabList) {
+        tabList.style.position = 'sticky';
+        tabList.style.top = '0px';
+        tabList.style.zIndex = '9999';
+        tabList.style.backgroundColor = '#e8eaf0';
+        tabList.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)';
+        tabList.style.paddingTop = '8px';
+        tabList.style.paddingBottom = '8px';
+    } else {
+        setTimeout(makeTabsSticky, 300);
+    }
+}
+makeTabsSticky();
+const observer = new MutationObserver(makeTabsSticky);
+observer.observe(window.parent.document.body, { childList: true, subtree: true });
+</script>
+""", height=0)
 
 # ═══════════════════════════════════════════════════════════
 # TAB 1 — Executive Summary
