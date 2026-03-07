@@ -1,4 +1,4 @@
-# 🏀 NBA Championship Predictor
+# NBA Championship Predictor
 
 A machine learning app that predicts which NBA team will win the 2025-26 Championship using live stats.
 
