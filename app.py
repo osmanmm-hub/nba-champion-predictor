@@ -168,13 +168,57 @@ with tab3:
     st.markdown("""
     We trained four different models and compared their performance.
     Each model was tested on data it had never seen before.
-
-    **How to read this table:**
-    - **AUC-ROC** — how well the model ranks contenders above non-contenders (higher is better)
-    - **F1** — balance between catching real contenders and avoiding false alarms
-    - **Precision** — of teams the model flagged as contenders, how many actually were?
-    - **Recall** — of actual champions, how many did the model correctly identify?
     """)
+
+    st.markdown("**How to read this table — explained like a basketball scout:**")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.info("""
+**AUC-ROC — Is the scout good at separating winners from losers?**
+
+Imagine lining up all 30 teams randomly. The scout has to sort them into
+"likely champion" vs "not a champion." AUC measures how often the scout
+correctly puts a real contender above a weak team.
+
+- Score of **1.0** = perfect every time
+- Score of **0.5** = just guessing randomly
+- Our model scores around **0.85** — pretty solid
+
+This is the most important metric for this app because we care about
+correctly ranking the best teams near the top, not just picking one winner.
+        """)
+
+        st.info("""
+**Precision — When the scout makes a pick, how often is he right?**
+
+Say the scout points at 5 teams and says "one of these will win it all."
+If 4 of those 5 were actually championship-caliber, precision is 80%.
+
+High precision = the scout doesn't waste your time with bad picks.
+        """)
+
+    with col2:
+        st.info("""
+**Recall — Did the scout find ALL the real contenders?**
+
+Out of every team that actually WAS a contender, how many did the
+scout catch? If there were 6 real contenders and he only spotted 4
+of them, recall is 67%.
+
+High recall = the scout doesn't miss anyone important.
+        """)
+
+        st.info("""
+**F1 — The scout's overall report card**
+
+Precision and recall trade off against each other. If the scout just
+points at every single team, recall is perfect but precision is terrible.
+
+F1 combines both into one score that rewards being accurate AND complete.
+Think of it as the scout's final grade.
+        """)
 
     st.dataframe(model_results.round(4))
 
