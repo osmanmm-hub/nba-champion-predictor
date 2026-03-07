@@ -430,29 +430,15 @@ with tab6:
         m2.metric(team_b, f'{prob_b:.1f}%',
                   delta=f'{prob_b - prob_a:+.1f}% vs {team_a}')
 
-        # Side-by-side stats table
-        st.subheader('Stats Comparison')
-        stats_cols = ['TEAM_NAME', 'W', 'L', 'W_PCT'] + FEATURES
-
         if not row_a.empty and not row_b.empty:
-            stats_a = row_a[stats_cols].iloc[0]
-            stats_b = row_b[stats_cols].iloc[0]
-
-            compare_df = pd.DataFrame({
-                team_a: stats_a,
-                team_b: stats_b,
-            }).drop('TEAM_NAME')
-
-            compare_df[f'Edge ({team_a})'] = (compare_df[team_a] - compare_df[team_b]).round(3)
-            st.dataframe(compare_df.round(3))
 
             # Visual bar comparison for key stats
             st.subheader('Key Stats — Side by Side')
             key_stats = ['W_PCT', 'PTS', 'PLUS_MINUS', 'FG3_PCT', 'TOV', 'AST']
-            key_stats = [s for s in key_stats if s in compare_df.index]
+            key_stats = [s for s in key_stats if s in row_a.columns]
 
-            vals_a = [float(compare_df.loc[s, team_a]) for s in key_stats]
-            vals_b = [float(compare_df.loc[s, team_b]) for s in key_stats]
+            vals_a = [float(row_a[s].values[0]) for s in key_stats]
+            vals_b = [float(row_b[s].values[0]) for s in key_stats]
 
             x = np.arange(len(key_stats))
             width = 0.35
