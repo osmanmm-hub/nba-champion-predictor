@@ -157,14 +157,7 @@ tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
 # TAB 1 — Executive Summary
 # ═══════════════════════════════════════════════════════════
 with tab1:
-    col_logo, col_title = st.columns([1, 10])
-    with col_logo:
-        st.image(
-            'https://upload.wikimedia.org/wikipedia/en/thumb/0/03/National_Basketball_Association_logo.svg/400px-National_Basketball_Association_logo.svg.png',
-            width=24
-        )
-    with col_title:
-        st.title('NBA Championship Predictor — 2025-26')
+    st.title('NBA Championship Predictor — 2025-26')
     st.caption(f'Data last refreshed: {last_updated}')
 
     # ── Project Summary first ─────────────────────────────
@@ -888,3 +881,13 @@ with tab7:
             st.markdown("- [ESPN NBA Injuries](https://www.espn.com/nba/injuries)")
             st.markdown("- [NBA.com Injury Report](https://www.nba.com/injuries)")
             st.markdown("- [CBS Sports](https://www.cbssports.com/nba/injuries/)")
+
+# ── Footer with NBA logo ──────────────────────────────────
+st.markdown("---")
+col_l, col_m, col_r = st.columns([2, 1, 2])
+with col_m:
+    st.image(
+        'https://upload.wikimedia.org/wikipedia/en/thumb/0/03/National_Basketball_Association_logo.svg/400px-National_Basketball_Association_logo.svg.png',
+        width=50
+    )
+    st.caption("NBA Championship Predictor · Data via nba_api")
