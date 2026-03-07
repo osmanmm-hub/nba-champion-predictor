@@ -38,7 +38,26 @@ st.markdown("""
         text-align: center;
         border-left: 4px solid #FDB927;
     }
-    .stTabs [data-baseweb="tab"] { font-size: 0.85rem; padding: 6px 10px; }
+    /* Sticky tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background-color: white;
+        padding: 6px 0 4px 0;
+        border-bottom: 2px solid #e0e0e0;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 0.85rem;
+        padding: 6px 10px;
+        font-weight: 500;
+    }
+    .stTabs [aria-selected="true"] {
+        border-bottom: 3px solid #17408B !important;
+        color: #17408B !important;
+        font-weight: 700 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
