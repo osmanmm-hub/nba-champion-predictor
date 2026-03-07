@@ -111,8 +111,13 @@ X_train, X_test, X_test_sc, y_train, y_test = get_test_split()
 
 # ── Tabs ─────────────────────────────────────────────────
 tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
-    '🏠 Summary','📊 Analytics','🤖 Models',
-    '🔍 Explainability','🔄 Replay','⚔️ H2H','📋 Accuracy & Injuries'
+    'Executive Summary',
+    'Descriptive Analytics',
+    'Model Performance',
+    'Explainability & Prediction',
+    'Season Replay',
+    'Head-to-Head',
+    'Accuracy & Injuries'
 ])
 
 # ═══════════════════════════════════════════════════════════
@@ -129,17 +134,7 @@ with tab1:
         st.title('NBA Championship Predictor — 2025-26')
     st.caption(f'Data last refreshed: {last_updated}')
 
-    st.warning("Predictions are based on regular season stats only and do not account for injuries, player availability, or playoff matchup dynamics.")
-
-    # Live top 3 cards
-    top3 = df_pred.nlargest(3, 'champ_prob_pct')
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric('🥇 Favorite',      top3.iloc[0]['team'], f"{top3.iloc[0]['champ_prob_pct']:.1f}%")
-    c2.metric('🥈 2nd',           top3.iloc[1]['team'], f"{top3.iloc[1]['champ_prob_pct']:.1f}%")
-    c3.metric('🥉 3rd',           top3.iloc[2]['team'], f"{top3.iloc[2]['champ_prob_pct']:.1f}%")
-    c4.metric('Best Model AUC',   f"{model_results['AUC-ROC'].max():.3f}", 'XGBoost')
-
-    st.markdown("---")
+    # ── Project Summary first ─────────────────────────────
     st.markdown("## About This Project")
     st.markdown("""
     As a longtime basketball fan and a big Kobe Bryant fan, I have always been curious
@@ -174,8 +169,29 @@ with tab1:
     right time — are far more likely to win championships.
     """)
 
-    # Interactive quick preview chart
-    st.markdown("### Current Top 10 Championship Probabilities")
+    st.markdown("---")
+
+    # ── Key stats ─────────────────────────────────────────
+    st.markdown("## Key Stats")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric('Years of Training Data', '25')
+    col2.metric('Teams in Current Season', str(len(df_current)))
+    col3.metric('Features Used', str(len(FEATURES)))
+    col4.metric('Best Model AUC', f"{model_results['AUC-ROC'].max():.3f}")
+
+    st.markdown("---")
+
+    # ── Championship Predictions second ───────────────────
+    st.markdown("## 2025-26 Championship Predictions")
+    st.warning("Predictions are based on regular season stats only and do not account for injuries, player availability, or playoff matchup dynamics.")
+    st.markdown("Current ranking of all 30 teams by predicted championship probability.")
+
+    top3 = df_pred.nlargest(3, 'champ_prob_pct')
+    c1, c2, c3 = st.columns(3)
+    c1.metric('Favorite',  top3.iloc[0]['team'], f"{top3.iloc[0]['champ_prob_pct']:.1f}%")
+    c2.metric('2nd Place', top3.iloc[1]['team'], f"{top3.iloc[1]['champ_prob_pct']:.1f}%")
+    c3.metric('3rd Place', top3.iloc[2]['team'], f"{top3.iloc[2]['champ_prob_pct']:.1f}%")
+
     top10 = df_pred.nlargest(10, 'champ_prob_pct').sort_values('champ_prob_pct')
     fig = px.bar(
         top10, x='champ_prob_pct', y='team', orientation='h',
@@ -839,5 +855,3 @@ with tab7:
             st.markdown("- [ESPN NBA Injuries](https://www.espn.com/nba/injuries)")
             st.markdown("- [NBA.com Injury Report](https://www.nba.com/injuries)")
             st.markdown("- [CBS Sports](https://www.cbssports.com/nba/injuries/)")
-            st.markdown("- [NBA.com Injury Report](https://www.nba.com/injuries)")
-            st.markdown("- [CBS Sports NBA Injuries](https://www.cbssports.com/nba/injuries/)")
