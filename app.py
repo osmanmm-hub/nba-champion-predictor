@@ -1,76 +1,57 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import shap
 import pickle
 import json
 import warnings
 from datetime import datetime
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, roc_auc_score
 warnings.filterwarnings('ignore')
 
-st.set_page_config(
-    page_title='NBA Championship Predictor',
-    page_icon='🏀',
-    layout='wide',
-    initial_sidebar_state='collapsed'
-)
-
-# ── Mobile-friendly CSS ───────────────────────────────────
-st.markdown("""
-<style>
-    .block-container { padding: 1rem 1rem 1rem 1rem; }
-    @media (max-width: 768px) {
-        .block-container { padding: 0.5rem; }
-        h1 { font-size: 1.4rem !important; }
-        h2 { font-size: 1.2rem !important; }
-        h3 { font-size: 1rem !important; }
-    }
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title='NBA Championship Predictor', layout='wide')
 
 # ── Conference mappings ───────────────────────────────────
 EASTERN = [
-    'Atlanta Hawks','Boston Celtics','Brooklyn Nets','Charlotte Hornets',
-    'Chicago Bulls','Cleveland Cavaliers','Detroit Pistons','Indiana Pacers',
-    'Miami Heat','Milwaukee Bucks','New York Knicks','Orlando Magic',
-    'Philadelphia 76ers','Toronto Raptors','Washington Wizards'
+    'Atlanta Hawks', 'Boston Celtics', 'Brooklyn Nets', 'Charlotte Hornets',
+    'Chicago Bulls', 'Cleveland Cavaliers', 'Detroit Pistons', 'Indiana Pacers',
+    'Miami Heat', 'Milwaukee Bucks', 'New York Knicks', 'Orlando Magic',
+    'Philadelphia 76ers', 'Toronto Raptors', 'Washington Wizards'
 ]
 WESTERN = [
-    'Dallas Mavericks','Denver Nuggets','Golden State Warriors','Houston Rockets',
-    'Los Angeles Clippers','Los Angeles Lakers','Memphis Grizzlies','Minnesota Timberwolves',
-    'New Orleans Pelicans','Oklahoma City Thunder','Phoenix Suns','Portland Trail Blazers',
-    'Sacramento Kings','San Antonio Spurs','Utah Jazz'
+    'Dallas Mavericks', 'Denver Nuggets', 'Golden State Warriors', 'Houston Rockets',
+    'Los Angeles Clippers', 'Los Angeles Lakers', 'Memphis Grizzlies', 'Minnesota Timberwolves',
+    'New Orleans Pelicans', 'Oklahoma City Thunder', 'Phoenix Suns', 'Portland Trail Blazers',
+    'Sacramento Kings', 'San Antonio Spurs', 'Utah Jazz'
 ]
+
 CHAMPIONS = {
-    '1999-00':'Los Angeles Lakers','2000-01':'Los Angeles Lakers',
-    '2001-02':'Los Angeles Lakers','2002-03':'San Antonio Spurs',
-    '2003-04':'Detroit Pistons',   '2004-05':'San Antonio Spurs',
-    '2005-06':'Miami Heat',        '2006-07':'San Antonio Spurs',
-    '2007-08':'Boston Celtics',    '2008-09':'Los Angeles Lakers',
-    '2009-10':'Los Angeles Lakers','2010-11':'Dallas Mavericks',
-    '2011-12':'Miami Heat',        '2012-13':'Miami Heat',
-    '2013-14':'San Antonio Spurs', '2014-15':'Golden State Warriors',
-    '2015-16':'Cleveland Cavaliers','2016-17':'Golden State Warriors',
-    '2017-18':'Golden State Warriors','2018-19':'Toronto Raptors',
-    '2019-20':'Los Angeles Lakers','2020-21':'Milwaukee Bucks',
-    '2021-22':'Golden State Warriors','2022-23':'Denver Nuggets',
-    '2023-24':'Boston Celtics',    '2024-25':'Oklahoma City Thunder',
+    '1999-00': 'Los Angeles Lakers', '2000-01': 'Los Angeles Lakers',
+    '2001-02': 'Los Angeles Lakers', '2002-03': 'San Antonio Spurs',
+    '2003-04': 'Detroit Pistons',    '2004-05': 'San Antonio Spurs',
+    '2005-06': 'Miami Heat',         '2006-07': 'San Antonio Spurs',
+    '2007-08': 'Boston Celtics',     '2008-09': 'Los Angeles Lakers',
+    '2009-10': 'Los Angeles Lakers', '2010-11': 'Dallas Mavericks',
+    '2011-12': 'Miami Heat',         '2012-13': 'Miami Heat',
+    '2013-14': 'San Antonio Spurs',  '2014-15': 'Golden State Warriors',
+    '2015-16': 'Cleveland Cavaliers','2016-17': 'Golden State Warriors',
+    '2017-18': 'Golden State Warriors','2018-19': 'Toronto Raptors',
+    '2019-20': 'Los Angeles Lakers', '2020-21': 'Milwaukee Bucks',
+    '2021-22': 'Golden State Warriors','2022-23': 'Denver Nuggets',
+    '2023-24': 'Boston Celtics',     '2024-25': 'Oklahoma City Thunder',
 }
 
 # ── Load models & data ────────────────────────────────────
 @st.cache_resource
 def load_models():
-    with open('model_xgb.pkl','rb') as f: xgb = pickle.load(f)
-    with open('model_rf.pkl', 'rb') as f: rf  = pickle.load(f)
-    with open('model_lr.pkl', 'rb') as f: lr  = pickle.load(f)
-    with open('scaler.pkl',   'rb') as f: sc  = pickle.load(f)
-    return xgb, rf, lr, sc
+    with open('model_xgb.pkl', 'rb') as f: xgb_model = pickle.load(f)
+    with open('model_rf.pkl',  'rb') as f: rf_model  = pickle.load(f)
+    with open('model_lr.pkl',  'rb') as f: lr_model  = pickle.load(f)
+    with open('scaler.pkl',    'rb') as f: scaler    = pickle.load(f)
+    return xgb_model, rf_model, lr_model, scaler
 
 @st.cache_data
 def load_data():
@@ -84,32 +65,37 @@ def load_data():
 xgb_model, rf_model, lr_model, scaler = load_models()
 df_hist, df_current, df_pred, model_results, FEATURES = load_data()
 
-def get_conf(t):
-    if t in EASTERN: return 'East'
-    if t in WESTERN: return 'West'
+def get_conference(team):
+    if team in EASTERN: return 'East'
+    if team in WESTERN: return 'West'
     return 'Unknown'
 
-df_pred['conference'] = df_pred['team'].apply(get_conf)
-df_hist['conference'] = df_hist['TEAM_NAME'].apply(get_conf)
+df_pred['conference'] = df_pred['team'].apply(get_conference)
+df_hist['conference'] = df_hist['TEAM_NAME'].apply(get_conference)
+
 last_updated = datetime.now().strftime('%B %d, %Y at %I:%M %p')
 
+# ── Prepare train/test split for ROC curves ───────────────
 @st.cache_data
 def get_test_split():
-    X = df_hist[FEATURES]; y = df_hist['champion']
-    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
-    return Xtr, Xte, scaler.transform(Xte), ytr, yte
+    X = df_hist[FEATURES]
+    y = df_hist['champion']
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42, stratify=y
+    )
+    X_test_sc = scaler.transform(X_test)
+    return X_train, X_test, X_test_sc, y_train, y_test
 
 X_train, X_test, X_test_sc, y_train, y_test = get_test_split()
 
-# ── Tabs ─────────────────────────────────────────────────
-tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
+# ── Tabs matching assignment rubric ──────────────────────
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     'Executive Summary',
     'Descriptive Analytics',
     'Model Performance',
     'Explainability & Prediction',
     'Season Replay',
     'Head-to-Head',
-    'Accuracy & Injuries'
 ])
 
 # ═══════════════════════════════════════════════════════════
@@ -119,220 +105,182 @@ with tab1:
     st.title('NBA Championship Predictor — 2025-26')
     st.caption(f'Data last refreshed: {last_updated}')
 
-    # ── Project Summary first ─────────────────────────────
+    st.warning(
+        "Predictions are based on regular season stats only and do not account for "
+        "injuries, player availability, or playoff matchups."
+    )
+
     st.markdown("## About This Project")
+
     st.markdown("""
-    As a longtime basketball fan and a big Kobe Bryant fan, I have always been curious
-    about what makes a team win a championship. For this project, I used team statistics
-    from the NBA Stats API (nba_api) covering approximately 25 seasons from 2000 to 2025.
-    Each row in the dataset represents one NBA team in one season, and the model predicts
-    whether that team won the championship that year (1 = champion, 0 = not champion).
-    The features include key team statistics such as win percentage, points per game,
-    rebounds, assists, turnovers, shooting efficiency, and net points per game — which
-    measures how much a team outscores its opponents on average across the season.
+    As a longtime basketball fan and a big Kobe Bryant fan, I have always been interested
+    in what really makes a team win a championship. For this project, I used team data
+    from the NBA Stats API through `nba_api`, covering about 25 NBA seasons from 2000 to 2025.
+    Each row in the dataset represents one NBA team in one season, and the goal is to predict
+    whether that team won the championship or not. The model uses team stats such as win percentage,
+    points per game, rebounds, assists, turnovers, shooting efficiency, and net points per game.
     """)
+
     st.markdown("""
-    Predicting an NBA champion is exciting but also very difficult. As fans, we often
-    rely on opinions or narratives, but data and statistics help reveal clearer patterns
-    behind winning teams. This type of analysis can be useful for fans, analysts, and
-    even front offices trying to understand what drives championship success. The problem
-    is especially challenging because only 1 out of 30 teams wins the championship each
-    year, creating a severe class imbalance in the data. A model that simply predicted
-    "no champion" for every team would be right 97% of the time — but completely useless.
-    Addressing this imbalance through class weights and choosing the right evaluation
-    metrics (AUC-ROC rather than accuracy) was a key part of building a meaningful model.
+    Predicting an NBA champion is exciting but also very difficult. Fans often rely on opinions
+    or narratives, but using statistics helps reveal clearer patterns behind winning teams.
+    This type of analysis can be useful for fans, analysts, and even front offices trying to
+    understand what drives championship success. The challenge is that only 1 out of 30 teams
+    wins the championship each year, which creates a big imbalance in the data.
     """)
+
     st.markdown("""
-    Based on the model's predictions using live 2025-26 season stats, the Detroit Pistons
-    currently have the highest championship probability, followed by the Oklahoma City
-    Thunder and the San Antonio Spurs. Among the four models tested — Logistic Regression,
-    Random Forest, XGBoost, and a Neural Network — XGBoost performed the best and produced
-    the most accurate predictions as measured by AUC-ROC. The results consistently show
-    that win percentage, net points per game (Plus/Minus), and shooting efficiency are
-    the most important factors in predicting a champion. This supports the idea that
-    balanced teams that dominate their opponents — not just teams that get hot at the
-    right time — are far more likely to win championships.
+    Based on the model's predictions using current 2025–26 season stats, the Detroit Pistons
+    currently show the highest championship probability, followed by the Oklahoma City Thunder
+    and the San Antonio Spurs. Out of the models tested, XGBoost performed the best based on
+    AUC score. The results also show that win percentage, net points per game, and shooting
+    efficiency are the most important factors in predicting a champion.
     """)
 
     st.markdown("---")
 
-    # ── Key stats ─────────────────────────────────────────
-    st.markdown("## Key Stats")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric('Years of Training Data', '25')
+    col1.metric('Seasons of Training Data', '25')
     col2.metric('Teams in Current Season', str(len(df_current)))
     col3.metric('Features Used', str(len(FEATURES)))
     col4.metric('Best Model AUC', f"{model_results['AUC-ROC'].max():.3f}")
 
     st.markdown("---")
+    st.markdown("""
+    **Features used in all models:**
+    Win/Loss record, Win Percentage, Points Per Game, Rebounds, Assists,
+    Turnovers, Steals, Blocks, Field Goal %, 3-Point %, Free Throw %,
+    and Plus/Minus (how much a team outscores opponents on average).
 
-    # ── Championship Predictions second ───────────────────
-    st.markdown("## 2025-26 Championship Predictions")
-    st.warning("Predictions are based on regular season stats only and do not account for injuries, player availability, or playoff matchup dynamics.")
-    st.markdown("Current ranking of all 30 teams by predicted championship probability.")
+    **Models trained:**
+    Logistic Regression (baseline), Decision Tree, Random Forest, XGBoost, Neural Network.
 
-    top3 = df_pred.nlargest(3, 'champ_prob_pct')
-    c1, c2, c3 = st.columns(3)
-    c1.metric('Favorite',  top3.iloc[0]['team'], f"{top3.iloc[0]['champ_prob_pct']:.1f}%")
-    c2.metric('2nd Place', top3.iloc[1]['team'], f"{top3.iloc[1]['champ_prob_pct']:.1f}%")
-    c3.metric('3rd Place', top3.iloc[2]['team'], f"{top3.iloc[2]['champ_prob_pct']:.1f}%")
-
-    top10 = df_pred.nlargest(10, 'champ_prob_pct').sort_values('champ_prob_pct')
-    fig = px.bar(
-        top10, x='champ_prob_pct', y='team', orientation='h',
-        color='champ_prob_pct', color_continuous_scale='YlOrRd',
-        labels={'champ_prob_pct': 'Championship %', 'team': ''},
-        text='champ_prob_pct'
-    )
-    fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-    fig.update_layout(
-        coloraxis_showscale=False, height=400,
-        margin=dict(l=10, r=60, t=20, b=20),
-        yaxis=dict(tickfont=dict(size=12)),
-        xaxis_title='Championship Probability (%)'
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    **Key finding:**
+    Win percentage and net points per game (Plus/Minus) are the strongest predictors
+    of championship success — teams that dominate opponents consistently are far more
+    likely to win a title than teams that simply win close games.
+    """)
 
 # ═══════════════════════════════════════════════════════════
 # TAB 2 — Descriptive Analytics
 # ═══════════════════════════════════════════════════════════
 with tab2:
     st.title('Descriptive Analytics')
+    st.markdown("Exploring what the data looks like before any modeling.")
+
     champs     = df_hist[df_hist['champion'] == 1]
     non_champs = df_hist[df_hist['champion'] == 0]
 
     # 2.1 Target distribution
     st.subheader('Target Variable Distribution')
-    fig = px.bar(
-        x=['Non-Champion', 'Champion'],
-        y=[len(non_champs), len(champs)],
-        color=['Non-Champion', 'Champion'],
-        color_discrete_map={'Champion': '#FDB927', 'Non-Champion': '#17408B'},
-        labels={'x': '', 'y': 'Count'},
-        text=[len(non_champs), len(champs)]
-    )
-    fig.update_traces(textposition='outside')
-    fig.update_layout(showlegend=False, height=350, margin=dict(t=20))
-    st.plotly_chart(fig, use_container_width=True)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(['Non-Champion', 'Champion'], [len(non_champs), len(champs)],
+           color=['steelblue', 'gold'], edgecolor='black')
+    ax.set_title('Class Balance: Champions vs Non-Champions (2000–2025)')
+    ax.set_ylabel('Number of Team-Seasons')
+    for i, v in enumerate([len(non_champs), len(champs)]):
+        ax.text(i, v + 2, str(v), ha='center', fontsize=11)
+    plt.tight_layout()
+    st.pyplot(fig)
     st.caption("""
-    Out of 26 seasons, only 26 team-seasons are labeled as champions (one per year) versus
-    roughly 690 non-champion team-seasons. This extreme class imbalance — about 1 champion
+    Out of 26 seasons, only 26 team-seasons are labeled as champions (one per year) compared
+    to roughly 690 non-champion team-seasons. This extreme class imbalance — about 1 champion
     per 30 teams — is the central challenge of this prediction task and was addressed using
     class weights in all models.
     """)
 
     # 2.2 Win % distribution
     st.subheader('Win Percentage: Champions vs All Teams')
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(x=non_champs['W_PCT'], name='Non-Champions',
-                               marker_color='#17408B', opacity=0.6, nbinsx=20))
-    fig.add_trace(go.Histogram(x=champs['W_PCT'], name='Champions',
-                               marker_color='#FDB927', opacity=0.9, nbinsx=10))
-    fig.update_layout(
-        barmode='overlay', height=380,
-        xaxis_title='Win Percentage', yaxis_title='Count',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02),
-        margin=dict(t=30)
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.hist(non_champs['W_PCT'], bins=20, alpha=0.6, color='steelblue', label='Non-Champions')
+    ax.hist(champs['W_PCT'], bins=8, alpha=0.9, color='gold', edgecolor='black', label='Champions')
+    ax.set_title('Regular Season Win % Distribution (2000–2025)')
+    ax.set_xlabel('Win Percentage')
+    ax.set_ylabel('Count')
+    ax.legend()
+    plt.tight_layout()
+    st.pyplot(fig)
     st.caption("""
-    Champions cluster tightly in the 0.60–0.80 win percentage range while non-champions
+    Champions are clustered tightly in the 0.60–0.80 win percentage range, while non-champions
     spread broadly from 0.20 to 0.75. No championship team in the last 25 years has finished
-    the regular season below a 50% win rate, making win percentage one of the strongest
-    single predictors in the dataset.
+    the regular season below a 50% win rate, making win percentage one of the strongest single
+    predictors in the dataset.
     """)
 
     # 2.3 Plus/Minus boxplot
-    st.subheader('Net Points Per Game (Plus/Minus)')
-    fig = go.Figure()
-    fig.add_trace(go.Box(y=non_champs['PLUS_MINUS'], name='Non-Champions',
-                         marker_color='#17408B', boxmean=True))
-    fig.add_trace(go.Box(y=champs['PLUS_MINUS'], name='Champions',
-                         marker_color='#FDB927', boxmean=True))
-    fig.add_hline(y=0, line_dash='dash', line_color='red',
-                  annotation_text='Break even')
-    fig.update_layout(height=400, yaxis_title='Net Points Per Game',
-                      margin=dict(t=20))
-    st.plotly_chart(fig, use_container_width=True)
+    st.subheader('Net Points Per Game (Plus/Minus): Champions vs Rest')
+    fig, ax = plt.subplots(figsize=(8, 5))
+    data = [non_champs['PLUS_MINUS'].values, champs['PLUS_MINUS'].values]
+    bp = ax.boxplot(data, patch_artist=True, labels=['Non-Champions', 'Champions'])
+    bp['boxes'][0].set_facecolor('steelblue')
+    bp['boxes'][1].set_facecolor('gold')
+    ax.set_title('Plus/Minus Distribution: Champions vs Non-Champions')
+    ax.set_ylabel('Net Points Per Game')
+    ax.axhline(0, color='red', linestyle='--', lw=1, label='Break even')
+    ax.legend()
+    plt.tight_layout()
+    st.pyplot(fig)
     st.caption("""
     Champions have a median Plus/Minus of around +6 to +8 points per game, meaning they
-    outscore opponents by a wide margin. Non-champions are centered near zero. This confirms
-    that true contenders dominate opponents rather than just winning close games.
+    outscore opponents by a wide margin on average. Non-champions are centered near zero.
+    This confirms that true contenders do not just win — they dominate, which is why
+    Plus/Minus is the second-strongest predictor in the model.
     """)
 
-    # 2.4 3PT% trend
+    # 2.4 3PT% trend over time
     st.subheader('3-Point Shooting % Over Time — Champions Only')
     champ_sorted = champs.sort_values('SEASON')
-    fig = px.line(
-        champ_sorted, x='SEASON', y='FG3_PCT',
-        markers=True, labels={'SEASON': 'Season', 'FG3_PCT': '3PT%'},
-        color_discrete_sequence=['#17408B']
-    )
-    fig.add_trace(go.Scatter(
-        x=champ_sorted['SEASON'],
-        y=np.poly1d(np.polyfit(range(len(champ_sorted)), champ_sorted['FG3_PCT'], 1))(range(len(champ_sorted))),
-        mode='lines', name='Trend', line=dict(dash='dash', color='red')
-    ))
-    fig.update_layout(height=380, margin=dict(t=20),
-                      xaxis_tickangle=-45)
-    st.plotly_chart(fig, use_container_width=True)
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(range(len(champ_sorted)), champ_sorted['FG3_PCT'],
+            marker='o', lw=2, color='steelblue', markerfacecolor='gold', markersize=8)
+    ax.set_xticks(range(len(champ_sorted)))
+    ax.set_xticklabels([s[:4] for s in champ_sorted['SEASON']], rotation=45, fontsize=8)
+    ax.set_title('Championship Team 3PT% by Season (2000–2025)')
+    ax.set_ylabel('3-Point FG%')
+    z = np.polyfit(range(len(champ_sorted)), champ_sorted['FG3_PCT'], 1)
+    p = np.poly1d(z)
+    ax.plot(range(len(champ_sorted)), p(range(len(champ_sorted))),
+            'r--', lw=1.5, label='Trend')
+    ax.legend()
+    plt.tight_layout()
+    st.pyplot(fig)
     st.caption("""
     There is a clear upward trend in 3-point shooting percentage among championship teams
-    since around 2014, coinciding with the start of the three-point revolution. Recent
-    champions like Golden State (2017-18) and Boston (2023-24) shot notably better from
-    three than champions of the early 2000s.
+    since around 2014, coinciding with the start of the "three-point revolution" in the NBA.
+    Recent champions like Golden State (2017-18) and Boston (2023-24) shot notably better
+    from three than champions of the early 2000s, reflecting how the game has changed.
     """)
 
-    # 2.5 Scatter — Win % vs Plus/Minus
-    st.subheader('Win % vs Plus/Minus — All Team-Seasons')
-    df_scatter = df_hist.copy()
-    df_scatter['Label'] = df_scatter['champion'].map({1: 'Champion', 0: 'Non-Champion'})
-    fig = px.scatter(
-        df_scatter, x='W_PCT', y='PLUS_MINUS',
-        color='Label',
-        color_discrete_map={'Champion': '#FDB927', 'Non-Champion': '#17408B'},
-        hover_data=['TEAM_NAME', 'SEASON'],
-        opacity=0.6,
-        labels={'W_PCT': 'Win %', 'PLUS_MINUS': 'Plus/Minus'},
-    )
-    fig.update_layout(height=420, margin=dict(t=20),
-                      legend=dict(orientation='h', yanchor='bottom', y=1.02))
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption("""
-    Champions (gold) cluster in the top-right corner — high win percentage AND high
-    plus/minus. Hover over any point to see which team and season it represents.
-    Non-champions that fall in the top-right are typically the runner-up or a strong
-    playoff team that fell short.
-    """)
-
-    # 2.6 Correlation heatmap
+    # 2.5 Correlation heatmap
     st.subheader('Correlation Heatmap')
-    corr = df_hist[FEATURES + ['champion']].corr().round(2)
-    fig = px.imshow(
-        corr, text_auto=True, aspect='auto',
-        color_continuous_scale='RdBu_r', zmin=-1, zmax=1,
-        labels=dict(color='Correlation')
-    )
-    fig.update_layout(height=500, margin=dict(t=20))
-    st.plotly_chart(fig, use_container_width=True)
+    import seaborn as sns
+    fig, ax = plt.subplots(figsize=(12, 9))
+    corr = df_hist[FEATURES + ['champion']].corr()
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+    sns.heatmap(corr, mask=mask, annot=True, fmt='.2f', cmap='RdYlBu_r',
+                center=0, linewidths=0.5, ax=ax)
+    ax.set_title('Feature Correlation Matrix', fontsize=14)
+    plt.tight_layout()
+    st.pyplot(fig)
     st.caption("""
-    Win percentage and Plus/Minus show the strongest positive correlation with the champion
-    label. Turnovers are negatively correlated — teams that turn the ball over frequently
-    rarely win championships. Wins and Win% are highly correlated with each other as expected.
+    Win percentage (W_PCT) and Plus/Minus show the strongest positive correlation with
+    the champion label. Turnovers (TOV) are negatively correlated — teams that turn the
+    ball over frequently rarely win championships. Wins (W) and Win% are highly correlated
+    with each other (as expected), suggesting some redundancy between those two features.
     """)
 
-    # 2.7 Champion averages
+    # 2.6 Champion averages table
     st.subheader('Average Stats: Champions vs Non-Champions')
     compare = pd.DataFrame({
         'Champions':     champs[FEATURES].mean(),
         'Non-Champions': non_champs[FEATURES].mean(),
     }).round(3)
-    compare['Edge'] = (compare['Champions'] - compare['Non-Champions']).round(3)
-    st.dataframe(compare, use_container_width=True)
+    compare['Edge (Champion)'] = (compare['Champions'] - compare['Non-Champions']).round(3)
+    st.dataframe(compare)
     st.caption("""
     Champions average about 10 more wins, a 12% higher win percentage, and nearly
     7 more net points per game than the average non-champion. The negative edge on
-    turnovers confirms champion-caliber teams protect the ball better than the rest.
+    turnovers confirms that champion-caliber teams protect the ball better than the rest.
     """)
 
 # ═══════════════════════════════════════════════════════════
@@ -340,98 +288,162 @@ with tab2:
 # ═══════════════════════════════════════════════════════════
 with tab3:
     st.title('Model Performance')
-    st.markdown("Five models trained on 25 years of NBA data. All evaluated on a 25% held-out test set.")
+    st.markdown("""
+    We trained five models on 25 years of historical NBA team stats (2000–2025).
+    All models were evaluated on a held-out 25% test set using random_state=42.
+    """)
 
-    with st.expander("What do these metrics mean?"):
-        c1, c2 = st.columns(2)
-        with c1:
-            st.info("**AUC-ROC** — How well does the model rank strong teams above weak ones? 1.0 = perfect, 0.5 = coin flip.")
-            st.info("**Precision** — When the model flags a contender, how often is it actually right?")
-        with c2:
-            st.info("**Recall** — Of all real contenders, how many did the model catch?")
-            st.info("**F1** — The combined grade balancing precision and recall.")
+    # Metric explanations
+    with st.expander("What do these metrics mean? (click to expand)"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("""
+**AUC-ROC — How good is the model at sorting teams correctly?**
 
+Think of it like a teacher predicting which students will pass before the final exam.
+AUC measures how often the model correctly places a strong team above a weak one.
+- **1.0** = perfect every time
+- **0.5** = no better than a coin flip
+- **Our best model: ~0.85+**
+            """)
+            st.info("""
+**Precision — When the model flags a contender, how often is it right?**
+
+If the model flags 10 teams as contenders and 8 actually were, precision is 80%.
+High precision means the model does not cry wolf.
+            """)
+        with col2:
+            st.info("""
+**Recall — Did the model catch every real contender?**
+
+Out of all truly championship-caliber teams, how many did the model find?
+If 8 were real contenders and the model caught 5, recall is 63%.
+High recall means the model does not miss anyone important.
+            """)
+            st.info("""
+**F1 — The combined overall grade**
+
+F1 balances precision and recall into one score.
+It only goes up when the model is both accurate and thorough.
+            """)
+
+    # Model comparison table
     st.subheader('Model Comparison Table')
-    st.dataframe(model_results.round(4).style.highlight_max(axis=0, color='#d4edda'),
-                 use_container_width=True)
+    st.dataframe(model_results.round(4).style.highlight_max(axis=0, color='#d4edda'))
 
-    # AUC bar chart — interactive
-    st.subheader('AUC-ROC by Model')
-    fig = px.bar(
-        model_results.reset_index(),
-        x='Model' if 'Model' in model_results.reset_index().columns else model_results.reset_index().columns[0],
-        y='AUC-ROC',
-        color='AUC-ROC', color_continuous_scale='Blues',
-        text='AUC-ROC'
-    )
-    fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-    fig.update_layout(coloraxis_showscale=False, height=380,
-                      yaxis_range=[0, 1.15], margin=dict(t=20))
-    st.plotly_chart(fig, use_container_width=True)
+    # AUC bar chart
+    st.subheader('AUC-ROC Comparison')
+    fig, ax = plt.subplots(figsize=(9, 4))
+    colors = ['steelblue', 'darkorange', 'gold', 'purple', 'gray'][:len(model_results)]
+    bars = ax.bar(model_results.index, model_results['AUC-ROC'],
+                  color=colors, edgecolor='black')
+    ax.set_ylim(0, 1.15)
+    ax.set_title('AUC-ROC Score by Model')
+    ax.set_ylabel('AUC-ROC')
+    for bar in bars:
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+                f'{bar.get_height():.3f}', ha='center', fontsize=11)
+    plt.xticks(rotation=15, ha='right')
+    plt.tight_layout()
+    st.pyplot(fig)
+    st.caption("""
+    XGBoost achieved the highest AUC-ROC, meaning it is best at correctly ranking
+    championship-caliber teams above average teams. Logistic Regression serves as
+    the baseline — all other models are compared against it.
+    """)
 
-    # ROC curves — interactive
+    # ROC Curves
     st.subheader('ROC Curves — All Models')
-    st.markdown("Hover over any curve to see the exact true/false positive rate at that threshold.")
-    fig = go.Figure()
+    st.markdown("""
+    The ROC curve plots the true positive rate vs. false positive rate at every
+    possible decision threshold. A model that hugs the top-left corner is better.
+    The diagonal dashed line represents random guessing.
+    """)
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+
     model_map = {
-        'Logistic Regression': (lr_model,  X_test_sc),
-        'Random Forest':       (rf_model,  X_test),
-        'XGBoost':             (xgb_model, X_test),
+        'Logistic Regression': (lr_model,  X_test_sc, False),
+        'Random Forest':       (rf_model,  X_test,    False),
+        'XGBoost':             (xgb_model, X_test,    False),
     }
-    palette = ['#17408B', '#C9082A', '#FDB927']
-    for (name, (model, X_use)), color in zip(model_map.items(), palette):
+
+    roc_colors = ['steelblue', 'darkorange', 'gold', 'purple']
+    for (name, (model, X_use, _)), color in zip(model_map.items(), roc_colors):
         try:
             proba = model.predict_proba(X_use)[:, 1]
             fpr, tpr, _ = roc_curve(y_test, proba)
             auc_val = auc(fpr, tpr)
-            fig.add_trace(go.Scatter(
-                x=fpr, y=tpr, mode='lines', name=f'{name} (AUC={auc_val:.3f})',
-                line=dict(width=2.5, color=color),
-                hovertemplate='FPR: %{x:.3f}<br>TPR: %{y:.3f}<extra>' + name + '</extra>'
-            ))
+            ax.plot(fpr, tpr, lw=2.5, color=color, label=f'{name} (AUC = {auc_val:.3f})')
         except Exception as e:
-            st.warning(f'Could not plot {name}: {e}')
-    fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode='lines', name='Random (AUC=0.5)',
-                             line=dict(dash='dash', color='gray', width=1)))
-    fig.update_layout(
-        height=480, xaxis_title='False Positive Rate', yaxis_title='True Positive Rate',
-        legend=dict(orientation='h', yanchor='bottom', y=-0.3),
-        margin=dict(t=20)
-    )
-    st.plotly_chart(fig, use_container_width=True)
+            st.warning(f'Could not plot ROC for {name}: {e}')
+
+    ax.plot([0, 1], [0, 1], 'k--', lw=1, label='Random guessing (AUC = 0.5)')
+    ax.set_xlabel('False Positive Rate', fontsize=13)
+    ax.set_ylabel('True Positive Rate', fontsize=13)
+    ax.set_title('ROC Curves — All Models', fontsize=15)
+    ax.legend(loc='lower right', fontsize=10)
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1.02])
+    plt.tight_layout()
+    st.pyplot(fig)
     st.caption("""
-    All three models clearly outperform random guessing (dashed line). XGBoost's curve
-    sits closest to the top-left corner, meaning it catches more real contenders while
-    producing fewer false alarms.
+    All three models clearly outperform random guessing (the dashed diagonal line).
+    XGBoost's curve sits closest to the top-left corner, confirming it achieves the
+    best balance between catching real contenders and avoiding false positives.
     """)
 
-    # Hyperparameters
+    # Best hyperparameters
     st.subheader('Best Hyperparameters from Cross-Validation')
-    c1, c2, c3 = st.columns(3)
-    with c1:
+    st.markdown("""
+    Each model was tuned using 5-fold GridSearchCV on the training set.
+    The parameters below produced the highest cross-validation AUC score.
+    """)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
         st.markdown("**Logistic Regression**")
         try:
-            p = lr_model.get_params()
-            st.json({'C': p.get('C'), 'class_weight': p.get('class_weight'), 'max_iter': p.get('max_iter')})
-        except: st.json({'note': 'See notebook'})
-    with c2:
+            lr_params = lr_model.get_params()
+            st.json({'C': lr_params.get('C', 'N/A'),
+                     'class_weight': lr_params.get('class_weight', 'N/A'),
+                     'max_iter': lr_params.get('max_iter', 'N/A')})
+        except:
+            st.json({'C': 'See notebook', 'class_weight': 'balanced'})
+
+    with col2:
         st.markdown("**Random Forest**")
         try:
-            p = rf_model.get_params()
-            st.json({'n_estimators': p.get('n_estimators'), 'max_depth': p.get('max_depth'), 'min_samples_leaf': p.get('min_samples_leaf')})
-        except: st.json({'note': 'See notebook'})
-    with c3:
+            rf_params = rf_model.get_params()
+            st.json({'n_estimators': rf_params.get('n_estimators', 'N/A'),
+                     'max_depth': rf_params.get('max_depth', 'N/A'),
+                     'min_samples_leaf': rf_params.get('min_samples_leaf', 'N/A'),
+                     'class_weight': rf_params.get('class_weight', 'N/A')})
+        except:
+            st.json({'n_estimators': 'See notebook', 'max_depth': 'See notebook'})
+
+    with col3:
         st.markdown("**XGBoost**")
         try:
-            p = xgb_model.get_params()
-            st.json({'n_estimators': p.get('n_estimators'), 'max_depth': p.get('max_depth'), 'learning_rate': p.get('learning_rate')})
-        except: st.json({'note': 'See notebook'})
+            xgb_params = xgb_model.get_params()
+            st.json({'n_estimators': xgb_params.get('n_estimators', 'N/A'),
+                     'max_depth': xgb_params.get('max_depth', 'N/A'),
+                     'learning_rate': xgb_params.get('learning_rate', 'N/A'),
+                     'scale_pos_weight': round(float(xgb_params.get('scale_pos_weight', 0)), 1)})
+        except:
+            st.json({'n_estimators': 'See notebook', 'max_depth': 'See notebook'})
 
     st.markdown("""
-    **Which model performed best?** XGBoost achieved the highest AUC-ROC and F1 score.
-    Logistic Regression was surprisingly competitive, suggesting win percentage and
-    plus/minus are strong linear predictors on their own. The trade-off is interpretability —
-    Logistic Regression is easy to explain, while XGBoost requires SHAP analysis.
+    **Which model performed best?**
+    XGBoost achieved the highest AUC-ROC and F1 score on the held-out test set.
+    This is expected — boosting algorithms iteratively correct their own mistakes,
+    making them well-suited for imbalanced tabular data like this dataset.
+    Logistic Regression, despite being the simplest model, performed surprisingly
+    well, which suggests that win percentage and plus/minus are strong linear
+    predictors of championship success on their own.
+    The trade-off is interpretability: Logistic Regression is easy to explain to
+    a non-technical audience, while XGBoost requires SHAP to understand its decisions.
     """)
 
 # ═══════════════════════════════════════════════════════════
@@ -439,42 +451,67 @@ with tab3:
 # ═══════════════════════════════════════════════════════════
 with tab4:
     st.title('Explainability & Interactive Prediction')
+
     subtab1, subtab2 = st.tabs(['SHAP Analysis', 'Interactive Prediction'])
 
+    # ── SHAP Analysis ──────────────────────────────────────
     with subtab1:
-        st.subheader('Why Does the Model Make These Predictions?')
-        st.markdown("Red = pushes probability up. Blue = pushes it down. Each dot is one team-season.")
+        st.subheader('SHAP Analysis — Why Does the Model Make These Predictions?')
+        st.markdown("""
+        SHAP (SHapley Additive exPlanations) breaks down each prediction to show exactly
+        how much each stat contributed — positively or negatively — to the final score.
+        Red = pushes the probability up. Blue = pushes it down.
+        """)
 
         explainer = shap.TreeExplainer(xgb_model)
         X_hist_feat = df_hist[FEATURES]
         shap_values = explainer.shap_values(X_hist_feat)
         sv = shap_values[1] if isinstance(shap_values, list) else shap_values
 
-        # Beeswarm (matplotlib — SHAP doesn't support Plotly natively)
-        st.markdown("**Summary Beeswarm Plot**")
-        plt.figure(figsize=(9, 5))
+        # Beeswarm
+        st.markdown("**Summary Plot (Beeswarm) — Feature Importance and Direction**")
+        st.markdown("""
+        Each dot is one team-season. Position left or right shows whether that stat
+        pushed the prediction toward champion (right) or away (left).
+        Color shows whether the feature value was high (red) or low (blue).
+        """)
+        plt.figure()
         shap.summary_plot(sv, X_hist_feat, feature_names=FEATURES, show=False)
         plt.tight_layout()
-        st.pyplot(plt.gcf(), use_container_width=True)
+        st.pyplot(plt.gcf())
         plt.clf()
-        st.caption("Win percentage and Plus/Minus dominate. High values (red) push the model toward predicting a championship. High turnovers (blue on TOV) push it away.")
+        st.caption("""
+        Win percentage (W_PCT) and Plus/Minus dominate the chart — high values of both
+        push the model strongly toward predicting a championship. Turnovers (TOV) work
+        in reverse: high turnover rates pull the prediction away from a championship outcome.
+        """)
 
-        # Bar — interactive with Plotly
-        st.markdown("**Feature Importance (Mean Absolute SHAP) — Interactive**")
-        mean_shap = np.abs(sv).mean(axis=0)
-        shap_df = pd.DataFrame({'Feature': FEATURES, 'Mean |SHAP|': mean_shap})
-        shap_df = shap_df.sort_values('Mean |SHAP|', ascending=True)
-        fig = px.bar(shap_df, x='Mean |SHAP|', y='Feature', orientation='h',
-                     color='Mean |SHAP|', color_continuous_scale='Oranges',
-                     labels={'Mean |SHAP|': 'Mean |SHAP Value|'})
-        fig.update_layout(coloraxis_showscale=False, height=420, margin=dict(t=20))
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("Win percentage is the most important feature by a clear margin. Plus/Minus and Wins follow closely. Turnovers rank mid-table but are negative predictors.")
+        # Bar plot
+        st.markdown("**Bar Plot — Overall Feature Importance (Mean Absolute SHAP)**")
+        plt.figure()
+        shap.summary_plot(sv, X_hist_feat, feature_names=FEATURES,
+                          plot_type='bar', show=False)
+        plt.tight_layout()
+        st.pyplot(plt.gcf())
+        plt.clf()
+        st.caption("""
+        Win percentage is the single most important feature by a clear margin, followed
+        by Plus/Minus and Wins. 3-point shooting percentage (FG3_PCT) ranks in the middle,
+        reflecting the growing importance of three-point shooting in the modern NBA.
+        """)
 
-        # Waterfall for top team
-        st.markdown("**Waterfall — Top 2025-26 Favorite**")
-        top_team_name = df_pred.nlargest(1, 'champ_prob_pct').iloc[0]['team']
-        top_prob = df_pred.nlargest(1, 'champ_prob_pct').iloc[0]['champ_prob_pct']
+        # Waterfall for top predicted team
+        st.markdown("**Waterfall Plot — Top 2025-26 Championship Favorite**")
+        st.markdown("""
+        This chart explains the prediction for the single team with the highest
+        championship probability this season. Each bar shows how much one stat
+        moved the prediction up or down from the baseline average.
+        """)
+
+        top_team = df_pred.sort_values('champ_prob_pct', ascending=False).iloc[0]
+        top_team_name = top_team['team']
+        top_team_prob = top_team['champ_prob_pct']
+
         top_row = df_current[df_current['TEAM_NAME'] == top_team_name]
         if not top_row.empty:
             X_top = top_row[[f for f in FEATURES if f in top_row.columns]]
@@ -482,163 +519,275 @@ with tab4:
             sv_top_use = sv_top[1][0] if isinstance(sv_top, list) else sv_top[0]
             ev = explainer.expected_value
             if isinstance(ev, (list, np.ndarray)): ev = float(ev[1])
-            st.markdown(f"**{top_team_name}** — {top_prob:.1f}% championship probability")
-            shap.waterfall_plot(shap.Explanation(
-                values=sv_top_use, base_values=ev,
-                data=X_top.iloc[0].values, feature_names=list(X_top.columns)
-            ), show=False)
-            st.pyplot(plt.gcf(), use_container_width=True)
+
+            st.markdown(f"**{top_team_name}** — {top_team_prob:.1f}% championship probability")
+
+            shap.waterfall_plot(
+                shap.Explanation(
+                    values=sv_top_use,
+                    base_values=ev,
+                    data=X_top.iloc[0].values,
+                    feature_names=list(X_top.columns)
+                ), show=False
+            )
+            st.pyplot(plt.gcf())
             plt.clf()
-            st.caption("Each bar shows exactly why this team is ranked #1. Red bars are strengths. Blue bars are weaknesses dragging the probability down slightly.")
+            st.caption("""
+            The waterfall shows the exact reason this team is ranked #1. Each red bar
+            is a stat where they outperform what a typical team looks like, pushing
+            their championship probability higher. Blue bars represent weaknesses
+            that slightly reduce their probability.
+            """)
 
+    # ── Interactive Prediction ──────────────────────────────
     with subtab2:
-        st.subheader('Build Your Own Team — Live Prediction')
-        st.markdown("Adjust the sliders and the model updates the championship probability instantly.")
+        st.subheader('Interactive Prediction — Build Your Own Team')
+        st.markdown("""
+        Use the sliders below to set team stats and see what championship probability
+        the model predicts. Adjust a few key stats or build a hypothetical team from scratch.
+        Stats not shown use the league average automatically.
+        """)
 
-        model_choice = st.selectbox('Model:', ['XGBoost (Best)', 'Random Forest', 'Logistic Regression'])
+        # Model selector
+        model_choice = st.selectbox(
+            'Select which model to use for prediction:',
+            ['XGBoost (Best)', 'Random Forest', 'Logistic Regression']
+        )
+
+        # League averages as defaults
         league_avg = df_hist[FEATURES].mean()
 
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            w_pct = st.slider('Win %', 0.10, 0.90, float(round(league_avg['W_PCT'], 2)), 0.01,
-                              help='0.61 = 50 wins in an 82-game season')
-            pts   = st.slider('Points/Game', 90.0, 130.0, float(round(league_avg['PTS'], 1)), 0.5)
-            pm    = st.slider('Plus/Minus', -15.0, 15.0, float(round(league_avg['PLUS_MINUS'], 1)), 0.5,
-                              help='Positive = outscoring opponents on average')
-        with c2:
-            fg3   = st.slider('3PT%', 0.28, 0.45, float(round(league_avg['FG3_PCT'], 3)), 0.005)
-            ast   = st.slider('Assists/Game', 15.0, 35.0, float(round(league_avg['AST'], 1)), 0.5)
-            tov   = st.slider('Turnovers/Game', 8.0, 20.0, float(round(league_avg['TOV'], 1)), 0.5,
-                              help='Lower is better')
-        with c3:
-            reb   = st.slider('Rebounds/Game', 35.0, 55.0, float(round(league_avg['REB'], 1)), 0.5)
-            fgpct = st.slider('FG%', 0.40, 0.55, float(round(league_avg['FG_PCT'], 3)), 0.005)
+        st.markdown("**Adjust the key stats below:**")
 
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            w_pct = st.slider(
+                'Win Percentage',
+                min_value=0.10, max_value=0.90,
+                value=float(round(league_avg['W_PCT'], 2)),
+                step=0.01,
+                help='Fraction of games won. 0.61 = 50 wins in an 82-game season.'
+            )
+            pts = st.slider(
+                'Points Per Game',
+                min_value=90.0, max_value=130.0,
+                value=float(round(league_avg['PTS'], 1)),
+                step=0.5,
+                help='Average points scored per game.'
+            )
+            plus_minus = st.slider(
+                'Plus/Minus (Net Points Per Game)',
+                min_value=-15.0, max_value=15.0,
+                value=float(round(league_avg['PLUS_MINUS'], 1)),
+                step=0.5,
+                help='How much the team outscores (positive) or is outscored by (negative) opponents on average.'
+            )
+
+        with col2:
+            fg3_pct = st.slider(
+                '3-Point FG%',
+                min_value=0.28, max_value=0.45,
+                value=float(round(league_avg['FG3_PCT'], 3)),
+                step=0.005,
+                help='Fraction of 3-point attempts made.'
+            )
+            ast = st.slider(
+                'Assists Per Game',
+                min_value=15.0, max_value=35.0,
+                value=float(round(league_avg['AST'], 1)),
+                step=0.5,
+                help='Average assists per game.'
+            )
+            tov = st.slider(
+                'Turnovers Per Game',
+                min_value=8.0, max_value=20.0,
+                value=float(round(league_avg['TOV'], 1)),
+                step=0.5,
+                help='Average turnovers per game. Lower is better.'
+            )
+
+        with col3:
+            reb = st.slider(
+                'Rebounds Per Game',
+                min_value=35.0, max_value=55.0,
+                value=float(round(league_avg['REB'], 1)),
+                step=0.5
+            )
+            fg_pct = st.slider(
+                'Field Goal %',
+                min_value=0.40, max_value=0.55,
+                value=float(round(league_avg['FG_PCT'], 3)),
+                step=0.005
+            )
+
+        # Build the input vector using sliders + league avg for remaining features
         user_input = league_avg.copy()
-        user_input.update({'W_PCT': w_pct, 'PTS': pts, 'PLUS_MINUS': pm,
-                           'FG3_PCT': fg3, 'AST': ast, 'TOV': tov,
-                           'REB': reb, 'FG_PCT': fgpct,
-                           'W': round(w_pct * 82), 'L': 82 - round(w_pct * 82)})
-        X_user    = pd.DataFrame([user_input[FEATURES]])
+        user_input['W_PCT']     = w_pct
+        user_input['PTS']       = pts
+        user_input['PLUS_MINUS']= plus_minus
+        user_input['FG3_PCT']   = fg3_pct
+        user_input['AST']       = ast
+        user_input['TOV']       = tov
+        user_input['REB']       = reb
+        user_input['FG_PCT']    = fg_pct
+        # Estimate W and L from W_PCT
+        user_input['W'] = round(w_pct * 82)
+        user_input['L'] = 82 - user_input['W']
+
+        X_user = pd.DataFrame([user_input[FEATURES]])
         X_user_sc = scaler.transform(X_user)
 
-        sel_model = xgb_model if 'XGBoost' in model_choice else (rf_model if 'Forest' in model_choice else lr_model)
-        X_inp     = X_user_sc if 'Logistic' in model_choice else X_user
+        # Select model
+        if model_choice == 'XGBoost (Best)':
+            selected_model = xgb_model
+            X_pred_input = X_user
+        elif model_choice == 'Random Forest':
+            selected_model = rf_model
+            X_pred_input = X_user
+        else:
+            selected_model = lr_model
+            X_pred_input = X_user_sc
 
-        raw_prob = sel_model.predict_proba(X_inp)[0][1]
-        curr_X   = df_current[[f for f in FEATURES if f in df_current.columns]]
-        curr_inp = scaler.transform(curr_X) if 'Logistic' in model_choice else curr_X
-        combined = np.append(sel_model.predict_proba(curr_inp)[:, 1], raw_prob)
+        # Predict
+        raw_prob = selected_model.predict_proba(X_pred_input)[0][1]
+
+        # Normalize against current season to get % probability
+        current_X = df_current[[f for f in FEATURES if f in df_current.columns]]
+        if model_choice == 'Logistic Regression':
+            current_X_input = scaler.transform(current_X)
+        else:
+            current_X_input = current_X
+
+        all_probs = selected_model.predict_proba(current_X_input)[:, 1]
+        combined  = np.append(all_probs, raw_prob)
         norm_prob = raw_prob / combined.sum() * 100
 
         st.markdown("---")
-        r1, r2, r3 = st.columns(3)
-        r1.metric('Championship Probability', f'{norm_prob:.1f}%')
-        r2.metric('Raw Score', f'{raw_prob:.4f}')
-        r3.metric('Est. Record', f"{int(round(w_pct*82))}–{82-int(round(w_pct*82))}")
+        st.subheader('Prediction Result')
 
-        top3_cutoff = df_pred.nlargest(3,'champ_prob_pct')['champ_prob_pct'].min()
-        if norm_prob >= top3_cutoff:
-            st.success('This team profile ranks in the Top 3 championship favorites!')
+        res_col1, res_col2, res_col3 = st.columns(3)
+        res_col1.metric('Championship Probability', f'{norm_prob:.1f}%')
+        res_col2.metric('Raw Model Score', f'{raw_prob:.4f}')
+        res_col3.metric('Model Used', model_choice.split(' ')[0])
+
+        # Context
+        top3 = df_pred.nlargest(3, 'champ_prob_pct')['champ_prob_pct'].min()
+        if norm_prob >= top3:
+            st.success('This team profile would rank in the Top 3 championship favorites!')
         elif norm_prob >= df_pred['champ_prob_pct'].quantile(0.75):
-            st.info('This team profile is a legitimate contender.')
+            st.info('This team profile would be considered a legitimate contender.')
         else:
-            st.warning('This team profile is not considered a championship favorite.')
-
-        # Gauge chart
-        fig = go.Figure(go.Indicator(
-            mode='gauge+number',
-            value=norm_prob,
-            title={'text': 'Championship Probability (%)'},
-            gauge={
-                'axis': {'range': [0, 30]},
-                'bar': {'color': '#FDB927'},
-                'steps': [
-                    {'range': [0, 5],  'color': '#f8d7da'},
-                    {'range': [5, 15], 'color': '#fff3cd'},
-                    {'range': [15, 30],'color': '#d4edda'},
-                ],
-                'threshold': {'line': {'color': 'red', 'width': 3}, 'value': top3_cutoff}
-            }
-        ))
-        fig.update_layout(height=280, margin=dict(t=30, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+            st.warning('This team profile would not be considered a championship favorite.')
 
         # SHAP waterfall for custom input
-        if 'Logistic' not in model_choice:
-            exp = shap.TreeExplainer(sel_model)
-            sv_u = exp.shap_values(X_user)
-            sv_u_use = sv_u[1][0] if isinstance(sv_u, list) else sv_u[0]
-            ev_u = exp.expected_value
-            if isinstance(ev_u, (list, np.ndarray)): ev_u = float(ev_u[1])
-            shap.waterfall_plot(shap.Explanation(
-                values=sv_u_use, base_values=ev_u,
-                data=X_user.iloc[0].values, feature_names=FEATURES
-            ), show=False)
-            st.pyplot(plt.gcf(), use_container_width=True)
+        if model_choice != 'Logistic Regression':
+            st.markdown("**Why did the model give this probability? (SHAP Waterfall)**")
+            exp = shap.TreeExplainer(selected_model)
+            sv_user = exp.shap_values(X_user)
+            sv_user_use = sv_user[1][0] if isinstance(sv_user, list) else sv_user[0]
+            ev_user = exp.expected_value
+            if isinstance(ev_user, (list, np.ndarray)): ev_user = float(ev_user[1])
+
+            shap.waterfall_plot(
+                shap.Explanation(
+                    values=sv_user_use,
+                    base_values=ev_user,
+                    data=X_user.iloc[0].values,
+                    feature_names=FEATURES
+                ), show=False
+            )
+            st.pyplot(plt.gcf())
             plt.clf()
+            st.caption("""
+            Red bars show which stats are boosting this team's championship probability.
+            Blue bars show which stats are dragging it down. The final value on the right
+            is the model's raw score before normalization.
+            """)
 
 # ═══════════════════════════════════════════════════════════
 # TAB 5 — Season Replay
 # ═══════════════════════════════════════════════════════════
 with tab5:
-    st.title('Season Replay')
-    st.markdown("Select any past season to see how the model would have ranked every team.")
-    st.warning("In-sample predictions — the model was trained on this data.")
+    st.title('Season Replay — What Would the Model Have Predicted?')
+    st.markdown("""
+    Select any past season to see what championship probability the model would have
+    assigned to every team. The actual champion is highlighted in gold.
+    """)
+    st.warning(
+        "These are in-sample predictions — the model was trained on this data. "
+        "Think of this as a sanity check rather than a true backtest."
+    )
 
     seasons = sorted(df_hist['SEASON'].unique())
-    sel_season = st.select_slider('Season:', options=seasons, value=seasons[-1])
-    df_s = df_hist[df_hist['SEASON'] == sel_season].copy()
-    actual_champ = CHAMPIONS.get(sel_season, 'Unknown')
+    selected_season = st.select_slider('Select a season:', options=seasons, value=seasons[-1])
 
-    if not df_s.empty:
-        X_s = df_s[[f for f in FEATURES if f in df_s.columns]]
-        proba_s = xgb_model.predict_proba(X_s)[:, 1]
-        df_s['champ_prob'] = (proba_s / proba_s.sum() * 100).round(1)
-        df_s['Champion'] = df_s['TEAM_NAME'].apply(lambda x: '🏆 ' + x if x == actual_champ else x)
-        df_s = df_s.sort_values('champ_prob', ascending=False).reset_index(drop=True)
+    df_season = df_hist[df_hist['SEASON'] == selected_season].copy()
+    actual_champion = CHAMPIONS.get(selected_season, 'Unknown')
 
-        champ_rank = df_s[df_s['TEAM_NAME'] == actual_champ].index[0] + 1
-        c1, c2, c3 = st.columns(3)
-        c1.metric('Season', sel_season)
-        c2.metric('Actual Champion', actual_champ)
-        c3.metric('Model Rank', f'#{champ_rank}',
-                  delta='Correct!' if champ_rank == 1 else f'Missed — #{champ_rank}',
-                  delta_color='normal' if champ_rank == 1 else 'inverse')
+    if not df_season.empty:
+        X_season = df_season[[f for f in FEATURES if f in df_season.columns]]
+        season_proba = xgb_model.predict_proba(X_season)[:, 1]
+        season_proba_norm = season_proba / season_proba.sum() * 100
 
-        df_s_plot = df_s.sort_values('champ_prob', ascending=True)
-        df_s_plot['color'] = df_s_plot['TEAM_NAME'].apply(
-            lambda x: '#FDB927' if x == actual_champ else '#17408B')
+        df_season_pred = pd.DataFrame({
+            'team': df_season['TEAM_NAME'].values,
+            'W': df_season['W'].values,
+            'W_PCT': df_season['W_PCT'].values,
+            'champ_prob_pct': season_proba_norm.round(1),
+            'Won Title': (df_season['TEAM_NAME'] == actual_champion).astype(int).values
+        }).sort_values('champ_prob_pct', ascending=False).reset_index(drop=True)
 
-        fig = px.bar(
-            df_s_plot, x='champ_prob', y='Champion', orientation='h',
-            text='champ_prob',
-            color='color', color_discrete_map='identity',
-            labels={'champ_prob': 'Championship Probability (%)', 'Champion': ''},
-        )
-        fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-        fig.update_layout(showlegend=False, height=600,
-                          margin=dict(l=10, r=60, t=20, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        predicted_rank = df_season_pred[df_season_pred['team'] == actual_champion].index[0] + 1
 
-        st.dataframe(
-            df_s[['TEAM_NAME','W','W_PCT','champ_prob']].rename(
-                columns={'TEAM_NAME':'Team','W':'Wins','W_PCT':'Win %','champ_prob':'Model Prob (%)'}
-            ), use_container_width=True
-        )
+        col1, col2, col3 = st.columns(3)
+        col1.metric('Season', selected_season)
+        col2.metric('Actual Champion', actual_champion)
+        col3.metric('Model Ranked Champion',
+                    f'#{predicted_rank}',
+                    delta='Correct!' if predicted_rank == 1 else f'Missed — ranked #{predicted_rank}',
+                    delta_color='normal' if predicted_rank == 1 else 'inverse')
+
+        df_s_sorted = df_season_pred.sort_values('champ_prob_pct', ascending=True)
+        bar_colors_s = ['gold' if t == actual_champion else
+                        'steelblue' if p >= df_s_sorted['champ_prob_pct'].quantile(0.75) else
+                        'lightgray'
+                        for t, p in zip(df_s_sorted['team'], df_s_sorted['champ_prob_pct'])]
+
+        fig, ax = plt.subplots(figsize=(10, max(6, len(df_s_sorted) * 0.38)))
+        ax.barh(df_s_sorted['team'], df_s_sorted['champ_prob_pct'],
+                color=bar_colors_s, edgecolor='black', linewidth=0.5)
+        ax.set_xlabel('Model Championship Probability (%)')
+        ax.set_title(f'{selected_season} — Model Predictions vs Actual Outcome', fontsize=13)
+        ax.legend(handles=[
+            mpatches.Patch(color='gold',      label=f'Actual Champion ({actual_champion})'),
+            mpatches.Patch(color='steelblue', label='Top quartile'),
+            mpatches.Patch(color='lightgray', label='Rest of league'),
+        ])
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        st.dataframe(df_season_pred.rename(columns={
+            'team': 'Team', 'W': 'Wins', 'W_PCT': 'Win %',
+            'champ_prob_pct': 'Model Probability (%)'
+        }))
 
 # ═══════════════════════════════════════════════════════════
 # TAB 6 — Head-to-Head
 # ═══════════════════════════════════════════════════════════
 with tab6:
-    st.title('Head-to-Head Comparison')
-    all_teams = sorted(df_pred['team'].tolist())
-    c1, c2 = st.columns(2)
-    with c1: team_a = st.selectbox('Team A:', all_teams, index=0)
-    with c2: team_b = st.selectbox('Team B:', all_teams, index=1)
+    st.title('Head-to-Head Team Comparison')
+    st.markdown("Select any two current teams to compare their stats and championship probabilities.")
+
+    all_teams_sorted = sorted(df_pred['team'].tolist())
+    col1, col2 = st.columns(2)
+    with col1:
+        team_a = st.selectbox('Team A:', all_teams_sorted, index=0)
+    with col2:
+        team_b = st.selectbox('Team B:', all_teams_sorted, index=1)
 
     if team_a == team_b:
-        st.warning('Select two different teams.')
+        st.warning('Please select two different teams.')
     else:
         row_a = df_current[df_current['TEAM_NAME'] == team_a]
         row_b = df_current[df_current['TEAM_NAME'] == team_b]
@@ -646,207 +795,54 @@ with tab6:
         prob_b = df_pred[df_pred['team'] == team_b]['champ_prob_pct'].values[0]
 
         m1, m2 = st.columns(2)
-        m1.metric(team_a, f'{prob_a:.1f}%', f'{prob_a-prob_b:+.1f}%')
-        m2.metric(team_b, f'{prob_b:.1f}%', f'{prob_b-prob_a:+.1f}%')
+        m1.metric(team_a, f'{prob_a:.1f}%', delta=f'{prob_a - prob_b:+.1f}% vs {team_b}')
+        m2.metric(team_b, f'{prob_b:.1f}%', delta=f'{prob_b - prob_a:+.1f}% vs {team_a}')
 
         if not row_a.empty and not row_b.empty:
-            key_stats = [s for s in ['W_PCT','PTS','PLUS_MINUS','FG3_PCT','TOV','AST'] if s in row_a.columns]
+            key_stats = ['W_PCT', 'PTS', 'PLUS_MINUS', 'FG3_PCT', 'TOV', 'AST']
+            key_stats = [s for s in key_stats if s in row_a.columns]
+
             vals_a = [float(row_a[s].values[0]) for s in key_stats]
             vals_b = [float(row_b[s].values[0]) for s in key_stats]
 
-            fig = go.Figure()
-            fig.add_trace(go.Bar(name=team_a, x=key_stats, y=vals_a,
-                                 marker_color='#17408B', text=[f'{v:.3f}' for v in vals_a],
-                                 textposition='outside'))
-            fig.add_trace(go.Bar(name=team_b, x=key_stats, y=vals_b,
-                                 marker_color='#FDB927', text=[f'{v:.3f}' for v in vals_b],
-                                 textposition='outside'))
-            fig.update_layout(barmode='group', height=420,
-                              legend=dict(orientation='h', yanchor='bottom', y=1.02),
-                              margin=dict(t=30))
-            st.plotly_chart(fig, use_container_width=True)
+            x = np.arange(len(key_stats))
+            width = 0.35
+            fig, ax = plt.subplots(figsize=(11, 5))
+            ax.bar(x - width/2, vals_a, width, label=team_a, color='steelblue', edgecolor='black')
+            ax.bar(x + width/2, vals_b, width, label=team_b, color='gold', edgecolor='black')
+            ax.set_xticks(x)
+            ax.set_xticklabels(key_stats, fontsize=11)
+            ax.set_title(f'{team_a} vs {team_b} — Key Stats', fontsize=13)
+            ax.legend()
+            plt.tight_layout()
+            st.pyplot(fig)
 
-            # SHAP side by side
-            st.subheader('What drives each team\'s probability?')
-            exp = shap.TreeExplainer(xgb_model)
+            st.subheader('What is driving each team\'s probability?')
             X_a = row_a[[f for f in FEATURES if f in row_a.columns]]
             X_b = row_b[[f for f in FEATURES if f in row_b.columns]]
-            sv_a = exp.shap_values(X_a); sv_b = exp.shap_values(X_b)
+
+            exp = shap.TreeExplainer(xgb_model)
+            sv_a = exp.shap_values(X_a)
+            sv_b = exp.shap_values(X_b)
             sv_a = sv_a[1] if isinstance(sv_a, list) else sv_a
             sv_b = sv_b[1] if isinstance(sv_b, list) else sv_b
 
-            feat_names = list(X_a.columns)
-            shap_a = pd.DataFrame({'Feature': feat_names, 'SHAP': sv_a[0]})
-            shap_b = pd.DataFrame({'Feature': feat_names, 'SHAP': sv_b[0]})
-
-            fig = make_subplots(rows=1, cols=2,
-                                subplot_titles=[f'{team_a} ({prob_a:.1f}%)', f'{team_b} ({prob_b:.1f}%)'])
-            for i, (sdf, color_pos, color_neg) in enumerate([
-                (shap_a, '#FDB927', '#17408B'),
-                (shap_b, '#FDB927', '#17408B')
+            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+            for ax_i, (sv_use, X_use, team_name, prob) in enumerate([
+                (sv_a, X_a, team_a, prob_a),
+                (sv_b, X_b, team_b, prob_b),
             ]):
-                sdf_s = sdf.sort_values('SHAP')
-                colors = ['#C9082A' if v > 0 else '#17408B' for v in sdf_s['SHAP']]
-                fig.add_trace(go.Bar(
-                    x=sdf_s['SHAP'], y=sdf_s['Feature'], orientation='h',
-                    marker_color=colors, showlegend=False
-                ), row=1, col=i+1)
-            fig.update_layout(height=420, margin=dict(t=40))
-            st.plotly_chart(fig, use_container_width=True)
-
-# ═══════════════════════════════════════════════════════════
-# TAB 7 — Accuracy & Injuries
-# ═══════════════════════════════════════════════════════════
-with tab7:
-    acc_tab, inj_tab = st.tabs(['Historical Accuracy', 'Injury Tracker'])
-
-    with acc_tab:
-        st.title('Historical Accuracy')
-        st.markdown("Did the model correctly rank the eventual champion as #1?")
-        st.warning("In-sample results — the model was trained on this data.")
-
-        accuracy_rows = []
-        for season, champ in CHAMPIONS.items():
-            df_s2 = df_hist[df_hist['SEASON'] == season].copy()
-            if df_s2.empty: continue
-            X_s2 = df_s2[[f for f in FEATURES if f in df_s2.columns]]
-            proba2 = xgb_model.predict_proba(X_s2)[:, 1]
-            df_s2['prob'] = proba2
-            df_s2_sorted = df_s2.sort_values('prob', ascending=False).reset_index(drop=True)
-            champ_rows = df_s2_sorted[df_s2_sorted['TEAM_NAME'] == champ]
-            if champ_rows.empty: continue
-            rank = int(champ_rows.index[0]) + 1
-            top_pick = df_s2_sorted.iloc[0]['TEAM_NAME']
-            wpc = df_s2[df_s2['TEAM_NAME'] == champ]['W_PCT'].values
-            accuracy_rows.append({
-                'Season': season,
-                'Actual Champion': champ,
-                "Win %": round(float(wpc[0]), 3) if len(wpc) > 0 else None,
-                "Model's #1 Pick": top_pick,
-                'Champion Rank': rank,
-                'Correct': rank == 1
-            })
-
-        acc_df = pd.DataFrame(accuracy_rows)
-        n_correct = acc_df['Correct'].sum()
-        n_total   = len(acc_df)
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric('Seasons Evaluated', str(n_total))
-        c2.metric('Champion Ranked #1', f'{n_correct} / {n_total}')
-        c3.metric('Accuracy', f'{n_correct/n_total*100:.0f}%')
-
-        # Interactive accuracy chart
-        acc_df['Result'] = acc_df['Correct'].map({True: 'Correct', False: 'Missed'})
-        fig = px.bar(
-            acc_df, x='Season', y='Champion Rank',
-            color='Result',
-            color_discrete_map={'Correct': '#28a745', 'Missed': '#dc3545'},
-            hover_data=['Actual Champion', "Model's #1 Pick", 'Win %'],
-            labels={'Champion Rank': 'Rank Given to Champion'},
-            text='Champion Rank'
-        )
-        fig.add_hline(y=1, line_dash='dash', line_color='gold', line_width=2,
-                      annotation_text='Perfect = Rank 1')
-        fig.update_traces(textposition='outside')
-        fig.update_layout(height=420, xaxis_tickangle=-45, margin=dict(t=20))
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("Green bars = seasons the model correctly ranked the champion #1. Hover over any bar to see details. Shorter bars are better.")
-
-        st.dataframe(
-            acc_df[['Season','Actual Champion','Win %',"Model's #1 Pick",'Champion Rank','Result']],
-            use_container_width=True
-        )
-
-    with inj_tab:
-        st.title('Injury Tracker')
-        st.markdown("The model does not account for injuries. Check current player availability before interpreting predictions.")
-        st.warning("A team ranked highly here may have key players currently out. Always cross-reference with injury reports.")
-
-        try:
-            import urllib.request, json as json_lib
-            url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json_lib.loads(resp.read().decode())
-
-            rows = []
-            for team_entry in data.get('injuries', []):
-                tn = team_entry.get('team', {}).get('displayName', 'Unknown')
-                conf = get_conf(tn)
-                for player in team_entry.get('injuries', []):
-                    athlete = player.get('athlete', {})
-                    rows.append({
-                        'Team': tn,
-                        'Conference': conf,
-                        'Player': athlete.get('displayName', 'Unknown'),
-                        'Position': athlete.get('position', {}).get('abbreviation', 'N/A') if isinstance(athlete.get('position'), dict) else 'N/A',
-                        'Status': player.get('status', 'Unknown'),
-                        'Injury': player.get('shortComment', 'N/A')[:60],
-                    })
-
-            if rows:
-                inj_df = pd.DataFrame(rows)
-                teams_list = ['All Teams'] + sorted(inj_df['Team'].unique().tolist())
-                sel_team = st.selectbox('Filter by team:', teams_list)
-                if sel_team != 'All Teams':
-                    inj_df = inj_df[inj_df['Team'] == sel_team]
-
-                # Conference breakdown
-                if sel_team == 'All Teams':
-                    conf_counts = inj_df['Conference'].value_counts().reset_index()
-                    conf_counts.columns = ['Conference', 'Count']
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        fig = px.bar(conf_counts, x='Conference', y='Count',
-                                     color='Conference',
-                                     color_discrete_map={'East':'#17408B','West':'#C9082A','Unknown':'gray'},
-                                     text='Count', title='Injuries by Conference')
-                        fig.update_traces(textposition='outside')
-                        fig.update_layout(showlegend=False, height=280, margin=dict(t=40))
-                        st.plotly_chart(fig, use_container_width=True)
-                    with c2:
-                        status_counts = inj_df['Status'].value_counts().reset_index()
-                        status_counts.columns = ['Status', 'Count']
-                        fig = px.bar(status_counts, x='Status', y='Count',
-                                     color='Status', text='Count', title='Injuries by Status')
-                        fig.update_traces(textposition='outside')
-                        fig.update_layout(showlegend=False, height=280, margin=dict(t=40))
-                        st.plotly_chart(fig, use_container_width=True)
-                else:
-                    status_counts = inj_df['Status'].value_counts().reset_index()
-                    status_counts.columns = ['Status', 'Count']
-                    fig = px.bar(status_counts, x='Status', y='Count',
-                                 color='Status', text='Count')
-                    fig.update_traces(textposition='outside')
-                    fig.update_layout(showlegend=False, height=280, margin=dict(t=20))
-                    st.plotly_chart(fig, use_container_width=True)
-
-                def highlight_status(row):
-                    if 'Out' in str(row['Status']): return ['background-color: #f8d7da'] * len(row)
-                    if 'Doubtful' in str(row['Status']): return ['background-color: #fff3cd'] * len(row)
-                    return [''] * len(row)
-
-                st.dataframe(
-                    inj_df[['Team','Conference','Player','Position','Status','Injury']].style.apply(highlight_status, axis=1),
-                    use_container_width=True
+                sorted_idx = np.argsort(np.abs(sv_use[0]))[::-1]
+                feature_names = list(X_use.columns)
+                colors = ['tomato' if v > 0 else 'steelblue' for v in sv_use[0][sorted_idx]]
+                axes[ax_i].barh(
+                    [feature_names[i] for i in sorted_idx][::-1],
+                    sv_use[0][sorted_idx][::-1],
+                    color=colors[::-1]
                 )
-                st.caption(f"Red = Out, Yellow = Doubtful. Showing {len(inj_df)} injuries across {inj_df['Team'].nunique()} teams.")
-            else:
-                st.info('No injury data returned from ESPN right now.')
+                axes[ax_i].axvline(0, color='black', lw=0.8)
+                axes[ax_i].set_title(f'{team_name}\n{prob:.1f}% championship probability', fontsize=11)
 
-        except Exception:
-            st.info("Live injury data unavailable. Check these sources directly:")
-            st.markdown("- [ESPN NBA Injuries](https://www.espn.com/nba/injuries)")
-            st.markdown("- [NBA.com Injury Report](https://www.nba.com/injuries)")
-            st.markdown("- [CBS Sports](https://www.cbssports.com/nba/injuries/)")
-
-# ── Footer with NBA logo ──────────────────────────────────
-st.markdown("---")
-col_l, col_m, col_r = st.columns([2, 1, 2])
-with col_m:
-    st.image(
-        'https://upload.wikimedia.org/wikipedia/en/thumb/0/03/National_Basketball_Association_logo.svg/400px-National_Basketball_Association_logo.svg.png',
-        width=50
-    )
-    st.caption("NBA Championship Predictor · Data via nba_api")
+            plt.suptitle('SHAP Feature Contributions', fontsize=13)
+            plt.tight_layout()
+            st.pyplot(fig)
