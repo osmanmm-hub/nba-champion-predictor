@@ -19,7 +19,7 @@ EASTERN = [
     'Atlanta Hawks', 'Boston Celtics', 'Brooklyn Nets', 'Charlotte Hornets',
     'Chicago Bulls', 'Cleveland Cavaliers', 'Detroit Pistons', 'Indiana Pacers',
     'Miami Heat', 'Milwaukee Bucks', 'New York Knicks', 'Orlando Magic',
-    'Philadelphia 76ers', 'Toronto Raptors', 'Washington Wizards'
+    'Philadelphia 76ers', 'Toronto Raptors', 'Washington Wizards.'
 ]
 WESTERN = [
     'Dallas Mavericks', 'Denver Nuggets', 'Golden State Warriors', 'Houston Rockets',
