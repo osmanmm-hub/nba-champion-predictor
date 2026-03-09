@@ -10,10 +10,10 @@ A machine learning app that predicts which NBA team will win the 2025-26 Champio
 
 ## How to use
 Visit the app and explore 4 tabs:
-- 📋 **Executive Summary** — overview of the methodology and key findings
-- 📊 **Historical Analysis** — what separates champions from the rest
-- 🤖 **Model Performance** — comparison of 4 ML models
-- 🏆 **Live Predictions** — current 2025-26 championship probabilities + SHAP explanation for any team
+- **Executive Summary** — overview of the methodology and key findings
+- **Historical Analysis** — what separates champions from the rest
+-  **Model Performance** — comparison of 4 ML models
+-  **Live Predictions** — current 2025-26 championship probabilities + SHAP explanation for any team
 
 ## Models Used
 - Logistic Regression
